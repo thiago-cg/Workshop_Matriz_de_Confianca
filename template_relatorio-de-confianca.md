@@ -4,7 +4,8 @@
 > Preenchido com os dados reais gerados no notebook `05_meu_modelo.ipynb` sobre o dataset `dataset_desafio_credito.csv`.
 
 **Modelo:** Regressão Logística com StandardScaler e OneHotEncoder (selecionada via Benchmark Comparativo de Modelos e refinada com Engenharia de Features)  
-**Time:** Squad de Prevenção a Fraude e Concessão de Crédito
+**Time:** Ana Paula Gomes de Matos, Felipe Carvalho, Giulio dos Anjos Santos, Hazel de Paula, Jhecy Ketlin Gomes Vieira, Luan Feres, Natalia Evelin, Pedro Henrique Gonçalves, Samantha Yumi, Sarah Gleice, Thiago Gonzaga 
+
 
 **Decisão que este modelo apoia:**  
 Triagem automatizada e decisão de crédito para solicitações de crédito pessoal originadas nos canais App, Agência e Correspondente Bancário, determinando se a proposta deve ser aprovada diretamente, rejeitada por suspeita de fraude/inadimplência ou encaminhada para análise humana especializada.
