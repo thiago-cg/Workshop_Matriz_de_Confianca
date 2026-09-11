@@ -3,7 +3,7 @@
 > Entregável do workshop Matriz de Confiança.
 > Preenchido com os dados reais gerados no notebook `05_meu_modelo.ipynb` sobre o dataset `dataset_desafio_credito.csv`.
 
-**Modelo:** Regressão Logística com StandardScaler e OneHotEncoder (selecionada via Benchmark Comparativo)  
+**Modelo:** Regressão Logística com StandardScaler e OneHotEncoder (selecionada via Benchmark Comparativo de Modelos e refinada com Engenharia de Features)  
 **Time:** Squad de Prevenção a Fraude e Concessão de Crédito
 
 **Decisão que este modelo apoia:**  
@@ -34,7 +34,9 @@ O que faria essa suposição falhar:
 
 ## 2 · Matriz de confusão
 
-Limiar operacional usado: **t\* = 0,041**
+Limiar operacional usado: **t\* = 0,041** *(Modelo Base) / **t\* = 0,056** (Modelo com Features)*
+
+Abaixo, a matriz no limiar operacional do modelo base:
 
 |  | Previsto POSITIVO (Fraude / Risco) | Previsto NEGATIVO (Legítimo) |
 |---|---|---|
@@ -56,6 +58,8 @@ O fraudador *Marcos Vinícius* solicita R$ 22.000 em 36 parcelas com documentos 
 | Precisão | Recall | Especificidade | Balanced acc. | MCC | AUPRC | baseline PR |
 |---|---|---|---|---|---|---|
 | **0,1313** (13,1%) | **0,8873** (88,7%) | **0,5089** (50,9%) | **0,6981** (69,8%) | **0,2117** | **0,2784** | **0,0772** (7,7%) |
+
+*(Com a Engenharia de Features implementada no Anexo B, a Precisão sobe para **15,29%**, a Balanced Accuracy para **72,12%** e o MCC para **0,2396**, eliminando 541 falsos positivos).*
 
 **Métrica primária escolhida:** **Recall da classe de Fraude/Inadimplência** (avaliado em conjunto com a Curva de Custo Total).
 
@@ -144,3 +148,63 @@ O modelo de Regressão Logística reduz os custos financeiros em 57,3% e captura
 - **Engenheiro de Machine Learning:** ___________________________________________
 - **Product Manager (Risco de Crédito):** ________________________________________
 - **Diretoria de Risco (CRO) / Validador Externo:** ______________________________
+
+---
+---
+
+# ANEXOS TÉCNICOS & STORYTELLING DA EVOLUÇÃO
+
+## Anexo A · Engenharia de Features & Racional de Negócio
+
+Para responder à preocupação com o volume de falsos positivos (2.447 clientes legítimos com propostas retidas), o squad desenhou 11 variáveis derivadas divididas em 4 pilares:
+
+1. **Capacidade de Pagamento & Alavancagem (DTI / Solvência):**
+   - `valor_parcela`: $\frac{\text{valor\_solicitado}}{\text{num\_parcelas}}$
+   - `parcela_renda`: Comprometimento da renda mensal exclusivamente com o novo empréstimo (limite prudencial Bacen: 30%).
+   - `solicitado_renda`: Alavancagem em múltiplos de salários.
+   - `divida_total_estimada`: Passivo bruto total acumulado.
+   - `comprometimento_pos_credito`: Endividamento total pós-concessão (`divida_renda` + `parcela_renda`).
+2. **Estabilidade & Maturidade do Solicitante:**
+   - `prop_vida_empregado`: Tempo de emprego relativo à idade adulta ($\text{idade} - 18$).
+   - `prop_vida_banco`: Tempo de relacionamento bancário relativo à idade adulta.
+   - `cliente_novo`: Sinalizador binário de contas com $\le 6$ meses de abertura (vetor clássico de fraudes *bust-out*).
+3. **Estresse Financeiro & "Credit Hunger" (Fome de Crédito):**
+   - `fator_estresse_credito`: $\text{consultas\_bureau\_6m} \times (\text{historico\_atraso\_12m} + 1)$ (busca ativa de crédito em múltiplos bancos concomitante a atrasos).
+   - `score_ponderado_divida`: Score de bureau descontado pelo nível de endividamento.
+   - `score_por_consulta`: Penalização por excesso de consultas recentes no bureau.
+4. **Risco Descoberto:**
+   - `alto_valor_sem_imovel`: Solicitações acima de R$ 20.000 sem garantia imobiliária.
+
+---
+
+## Anexo B · Benchmark Comparativo Completo (Modelos 100% Treinados)
+
+Treinamos ambos os modelos passando por todo o ciclo: Treino (`X_tr2`), Calibração (`X_val`), Otimização de Custo ($C_{FN}=2000, C_{FP}=100$) e Avaliação no Teste (`X_te`).
+
+| Modelo | Limiar Ótimo ($t^*$) | Custo Total em $t^*$ | VP (Fraudes Pegas) | FN (Perdidas) | FP (Atrito) | Recall | Precisão | Balanced Acc | MCC | AUC-ROC | ECE |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Regressão Logística (Base)** | 0,0410 | R$ 338.700 | 370 | 47 | 2.447 | 88,7% | 13,1% | 69,8% | 0,2117 | **0,7972** | **0,0052** |
+| **Regressão Logística (+ Features)** | **0,0560** | **R$ 336.600** | 344 | 73 | **1.906** | 82,5% | **15,3%** | **72,1%** | **0,2396** | 0,7952 | 0,0066 |
+| **Random Forest (+ Feat Bruta)** | 0,0360 | R$ 391.000 | 363 | 54 | 2.830 | 87,1% | 11,4% | 65,1% | 0,1643 | 0,7619 | 0,0132 |
+| **Random Forest (+ Feat Calibrada)** | 0,0310 | R$ 394.200 | 334 | 83 | 2.282 | 80,1% | 12,8% | 67,2% | 0,1832 | 0,7597 | 0,0080 |
+
+### Principais Descobertas do Benchmark:
+1. **Regressão Logística é Imbatível em Custo:** Tanto na versão base (R$ 338k) quanto na versão com features (**R$ 336k**), a Regressão Logística gerou um custo substancialmente menor que a Random Forest (R$ 391k a R$ 394k).
+2. **Eliminação de 541 Falsos Positivos:** A inclusão das variáveis de razão (DTI e alavancagem) permitiu subir o limiar da Regressão Logística de 0,041 para 0,056, **reduzindo os FPs de 2.447 para 1.906** e elevando a precisão para **15,29%** e a Balanced Accuracy para **72,12%**.
+3. **Random Forest Sofreu com Colinearidade:** Por particionar o espaço recursivamente sem regularização L2, a Random Forest sofreu com o aumento de dimensionalidade de features de razão, elevando seus falsos positivos e seu custo global.
+4. **Comportamento no Subgrupo Norte:** Na Random Forest com features, o recall da Região Norte subiu para **80,56%** (capturou 29 das 36 fraudes), mas à custa de uma precisão muito baixa (9,35%), comprovando a hipótese de que o Norte exige regras locais específicas.
+
+---
+
+## Anexo C · Storytelling do Squad e Decisões de Arquitetura
+
+### A Evolução do Squad em 5 Atos:
+1. **A Ilusão da Acurácia:** Começamos no limiar $0,5$ com 92,2% de acurácia, mas descobrindo que o modelo pegava menos de 1% das fraudes.
+2. **A Descoberta da Matriz de Custo:** Ao colocar R$ 2.000 para a fraude e R$ 100 para o atrito (razão 20:1), o limiar caiu para 0,041. O recall foi para 88,7%, mas gerou um choque de 2.447 clientes barrados.
+3. **A Escolha Consciente do Algoritmo:** Provamos que a Regressão Logística superou a Random Forest por ter probabilidades contínuas (sem degraus de 0,005) e calibração nativa (ECE = 0,0052).
+4. **O Refinamento com Features:** Criamos variáveis de razão e solvência bancária, elevando a precisão para 15,3% e eliminando 541 falsos positivos.
+5. **A Solução Arquitetural Definitiva (Esteira de 3 Zonas):**  
+   Não tratamos a saída do modelo como aprovação/reprovação cega. Desenhamos a esteira em 3 faixas operacionais:
+   - **Zona Verde ($p < 0,05$):** 60% das propostas. Aprovação direta e imediata no app.
+   - **Zona Amarela ($0,05 \le p \le 0,25$):** 35% das propostas. Fricção leve com biometria facial e análise da Mesa Humana de Crédito (SLA de 4 horas).
+   - **Zona Vermelha ($p > 0,25$):** 5% das propostas. Recusa preventiva com pedido de comparecimento à agência.

@@ -1,6 +1,6 @@
 # Workshop: Matriz de Confiança 🎯
 
-Repositório do **Workshop Matriz de Confiança**, focado na avaliação de modelos de Machine Learning em cenários reais de negócio com forte desbalanceamento de classes, análise de custos de erro, calibração de probabilidades e políticas de abstenção operacional.
+Repositório do **Workshop Matriz de Confiança**, focado na avaliação de modelos de Machine Learning em cenários reais de negócio com forte desbalanceamento de classes, análise de custos de erro, calibração de probabilidades, políticas de abstenção e engenharia de features de crédito e antifraude.
 
 ---
 
@@ -20,10 +20,10 @@ Neste projeto, resolvemos o desafio prático de **Detecção de Fraude e Risco d
 ├── 02_custo_limiar.ipynb            # Bloco 2: Matriz de custo e otimização de limiar operacional
 ├── 03_calibracao.ipynb              # Bloco 3: Confiabilidade, ECE, Brier e calibração de probabilidades
 ├── 04_incerteza.ipynb               # Bloco 4: Incerteza epistêmica e política de abstenção
-├── 05_meu_modelo.ipynb              # O Desafio do Squad: Benchmark e pipeline ponta a ponta
+├── 05_meu_modelo.ipynb              # O Desafio do Squad: Benchmark, Feature Engineering e Pipeline Completo
 ├── dataset_desafio_credito.csv      # Dataset do desafio de crédito (18.000 amostras)
-├── relatorio-de-confianca.md        # Relatório de Confiança executivo preenchido com os 9 entregáveis
-├── template_relatorio-de-confianca.md # Template original do entregável
+├── relatorio-de-confianca.md        # Relatório de Confiança com os 9 entregáveis + Anexos Técnicos
+├── template_relatorio-de-confianca.md # Template original preenchido
 ├── matriz-de-confianca-slides.key   # Slides originais do workshop (Keynote)
 └── matriz-de-confianca-slides.ppt   # Slides originais do workshop (PowerPoint)
 ```
@@ -32,31 +32,34 @@ Neste projeto, resolvemos o desafio prático de **Detecção de Fraude e Risco d
 
 ## 🚀 Principais Descobertas e Resultados
 
-### 1. Benchmark de Seleção de Modelo
-Comparamos três famílias nos mesmos splits estratificados (treino, calibração e teste):
-- **Regressão Logística (Modelo Campeão):** **AUC-ROC de 0,7972**, **AUPRC de 0,2784** e **ECE de 0,0052**, gerando o menor custo financeiro (**R$ 338.700**).
-- **Random Forest:** AUC-ROC de 0,7687 | AUPRC de 0,2347 | Custo R$ 373.100.
-- **HistGradientBoosting:** AUC-ROC de 0,7717 | AUPRC de 0,2306 | Custo R$ 369.500.
+### 1. Benchmark Comparativo Completo (Modelos 100% Treinados)
 
-### 2. A Armadilha do Limiar Default ($t=0,5$) vs Limiar Ótimo ($t^*=0,041$)
-- No limiar padrão $0,5$: Acurácia de 92,2%, mas o **Recall era de apenas 0,96%** (deixava passar 413 das 417 fraudes!).
-- No limiar operacional derivado pela matriz de custos ($C_{FN}=\text{R\$} 2.000$ e $C_{FP}=\text{R\$} 100$, razão 20:1):
-  - **Limiar Ótimo:** $t^* = 0,041$
-  - **Recall:** Saltou para **88,73%** (captura 370 fraudes).
-  - **Redução de Custo Financeiro:** De R$ 793.900 para R$ 338.700 (**economia de 57,3%** / R$ 455.200 no lote de teste).
+Avaliamos nos mesmos splits estratificados os dois modelos principais com e sem Engenharia de Features:
 
-### 3. Fatiamento por Subgrupos
-- Identificação de disparidade crítica na **Região Norte** (Recall de 69,44% vs 92,86% no Sudeste), motivando a criação de um limiar regional mais protetivo.
+| Modelo | Limiar Ótimo ($t^*$) | Custo Total em $t^*$ | VP (Fraudes Pegas) | FN (Perdidas) | FP (Atrito) | Recall | Precisão | Balanced Acc | MCC | AUC-ROC | ECE |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Regressão Logística (Base)** | 0,0410 | R$ 338.700 | 370 | 47 | 2.447 | 88,7% | 13,1% | 69,8% | 0,2117 | **0,7972** | **0,0052** |
+| **Regressão Logística (+ Features)** | **0,0560** | **R$ 336.600** | 344 | 73 | **1.906** | 82,5% | **15,3%** | **72,1%** | **0,2396** | 0,7952 | 0,0066 |
+| **Random Forest (+ Feat Bruta)** | 0,0360 | R$ 391.000 | 363 | 54 | 2.830 | 87,1% | 11,4% | 65,1% | 0,1643 | 0,7619 | 0,0132 |
+| **Random Forest (+ Feat Calibrada)** | 0,0310 | R$ 394.200 | 334 | 83 | 2.282 | 80,1% | 12,8% | 67,2% | 0,1832 | 0,7597 | 0,0080 |
 
-### 4. Política de Abstenção e Revisão Humana
-- Cobertura de 90%: 10% dos casos mais limítrofes ($|p - t^*|$) são enviados para a **Mesa Humana de Crédito** (~18 casos/dia útil), retendo 26 fraudes limítrofes e elevando o recall automatizado para mais de 90%.
+### 2. O Impacto da Engenharia de Features
+Desenvolvemos 11 variáveis de domínio bancário (*DTI da nova operação*, *alavancagem de salários*, *estabilidade profissional relativa*, *índice de estresse de consultas e atrasos*):
+- Na **Regressão Logística**, as variáveis de razão permitiram capturar relações não-lineares de solvência, **eliminando 541 falsos positivos** (de 2.447 para 1.906), elevando a precisão para **15,29%** e a Balanced Accuracy para **72,12%**, com o menor custo financeiro do projeto (**R$ 336.600**).
+- Na **Random Forest**, o aumento de dimensionalidade com variáveis colineares aumentou a variância das árvores, elevando o custo para R$ 391.000.
+
+### 3. A Solução Arquitetural: Esteira de 3 Zonas
+Para não submeter clientes a uma decisão binária cega em um cenário de classe desbalanceada, adotamos:
+1. **Zona Verde ($p < 0,05$):** Aprovação direta no app (60% do volume).
+2. **Zona Amarela ($0,05 \le p \le 0,25$):** Fricção leve com biometria facial e análise pela Mesa Humana de Risco (SLA de 4 horas).
+3. **Zona Vermelha ($p > 0,25$):** Recusa preventiva e direcionamento para agência.
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
 - **Python 3.12**
-- **scikit-learn** (Classificadores, CalibratedClassifierCV, Pipeline, Métricas)
+- **scikit-learn** (Pipelines, LogisticRegression, RandomForestClassifier, CalibratedClassifierCV)
 - **pandas** e **numpy**
 - **matplotlib**
 
